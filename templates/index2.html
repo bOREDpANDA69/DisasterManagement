@@ -1,0 +1,328 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Response Chatbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        
+        h1 {
+            color: #d32f2f;
+            text-align: center;
+        }
+        
+        .content {
+            display: flex;
+            flex-grow: 1;
+            margin-top: 20px;
+        }
+        
+        .chat-container {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            margin-right: 20px;
+        }
+        
+        .map-container {
+            flex: 1;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        #map-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .chat-messages {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: calc(100vh - 300px);
+        }
+        
+        .chat-input {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #eee;
+        }
+        
+        #message-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        
+        button {
+            background: #d32f2f;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .user-message, .bot-message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 80%;
+        }
+        
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: auto;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .bot-message {
+            background-color: #f1f1f1;
+            margin-right: auto;
+            border-bottom-left-radius: 4px;
+        }
+        
+        .question-button {
+            background: #f1f1f1;
+            color: #333;
+            border: 1px solid #ddd;
+            padding: 8px 15px;
+            margin: 5px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .questions-container {
+            display: flex;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        
+        .loading {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        .dot {
+            height: 10px;
+            width: 10px;
+            margin: 0 5px;
+            background-color: #d32f2f;
+            border-radius: 50%;
+            animation: bounce 1.5s infinite alternate;
+        }
+        
+        .dot:nth-child(2) {
+            animation-delay: 0.5s;
+        }
+        
+        .dot:nth-child(3) {
+            animation-delay: 1s;
+        }
+        
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Disaster Response Chatbot</h1>
+        
+        <div class="content">
+            <div class="chat-container">
+                <div class="chat-messages" id="chat-messages">
+                    <div class="bot-message">
+                        I'm your disaster response assistant. Please report any disaster situation, and I'll help coordinate a response. For example, try: "An earthquake has been reported in Brooklyn, New York."
+                    </div>
+                </div>
+                
+                <div class="chat-input">
+                    <input type="text" id="message-input" placeholder="Describe the disaster situation...">
+                    <button id="send-button">Send</button>
+                </div>
+            </div>
+            
+            <div class="map-container">
+                <iframe id="map-frame" src="/static/placeholder_map.html"></iframe>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const messagesContainer = document.getElementById('chat-messages');
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const mapFrame = document.getElementById('map-frame');
+            
+            // Initialize with a placeholder map
+            fetch('/static/placeholder_map.html')
+                .catch(() => {
+                    // Create a simple placeholder if file doesn't exist
+                    const placeholderContent = `
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <style>
+                                body {
+                                    display: flex;
+                                    justify-content: center;
+                                    align-items: center;
+                                    height: 100vh;
+                                    margin: 0;
+                                    background-color: #f5f5f5;
+                                    font-family: Arial, sans-serif;
+                                    color: #666;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div>Report a disaster to see the response map</div>
+                        </body>
+                        </html>
+                    `;
+                    
+                    const blob = new Blob([placeholderContent], {type: 'text/html'});
+                    mapFrame.src = URL.createObjectURL(blob);
+                });
+            
+            function addUserMessage(message) {
+                const messageElement = document.createElement('div');
+                messageElement.className = 'user-message';
+                messageElement.textContent = message;
+                messagesContainer.appendChild(messageElement);
+                messageInput.value = '';
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            function addBotMessage(message) {
+                const messageElement = document.createElement('div');
+                messageElement.className = 'bot-message';
+                messageElement.textContent = message;
+                messagesContainer.appendChild(messageElement);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            function addQuestions(questions) {
+                if (!questions || questions.length === 0) return;
+                
+                const containerElement = document.createElement('div');
+                containerElement.className = 'questions-container';
+                
+                questions.forEach(question => {
+                    const questionButton = document.createElement('button');
+                    questionButton.className = 'question-button';
+                    questionButton.textContent = question;
+                    questionButton.addEventListener('click', function() {
+                        addUserMessage(question);
+                        sendMessage(question);
+                    });
+                    containerElement.appendChild(questionButton);
+                });
+                
+                messagesContainer.appendChild(containerElement);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            function showLoading() {
+                const loadingElement = document.createElement('div');
+                loadingElement.className = 'loading';
+                loadingElement.id = 'loading-indicator';
+                
+                for (let i = 0; i < 3; i++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'dot';
+                    loadingElement.appendChild(dot);
+                }
+                
+                messagesContainer.appendChild(loadingElement);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            function hideLoading() {
+                const loadingElement = document.getElementById('loading-indicator');
+                if (loadingElement) {
+                    loadingElement.remove();
+                }
+            }
+            
+            function sendMessage(message) {
+                showLoading();
+                
+                fetch('/api/respond', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    hideLoading();
+                    addBotMessage(data.text_response);
+                    addQuestions(data.follow_up_questions);
+                    
+                    // Update map
+                    if (data.map_file) {
+                        mapFrame.src = `/static/${data.map_file}`;
+                    }
+                })
+                .catch(error => {
+                    hideLoading();
+                    console.error('Error:', error);
+                    addBotMessage('Sorry, there was an error processing your request. Please try again.');
+                });
+            }
+            
+            sendButton.addEventListener('click', function() {
+                const message = messageInput.value.trim();
+                if (message) {
+                    addUserMessage(message);
+                    sendMessage(message);
+                }
+            });
+            
+            messageInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const message = messageInput.value.trim();
+                    if (message) {
+                        addUserMessage(message);
+                        sendMessage(message);
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+        
